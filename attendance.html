@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Attendance System</title>
+<style>
+/* FONT */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  background: #f4f6f8;
+  color: #333;
+}
+
+/* NAVBAR */
+.navbar {
+  display: flex;
+  gap: 15px;
+  background: #2563eb;
+  color: white;
+  padding: 12px 20px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  border-radius: 0 0 15px 15px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-item {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.nav-item:hover {
+  background: rgba(255,255,255,0.2);
+  transform: scale(1.05);
+  text-decoration: none;
+}
+
+/* CONTAINER / PAGES */
+.container {
+  padding: 25px;
+  max-width: 900px;
+  margin: 20px auto;
+}
+
+/* CARD STYLE PAGES */
+.card {
+  background: #fff;
+  padding: 25px;
+  border-radius: 15px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+}
+
+/* LOGIN */
+.login-container {
+  max-width: 380px;
+  margin: 100px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 15px;
+  text-align: center;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  transition: all 0.3s ease;
+}
+
+.login-container input {
+  width: 80%;
+  padding: 12px;
+  margin: 12px 0;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  transition: border 0.3s ease;
+}
+
+.login-container input:focus {
+  border-color: #2563eb;
+  outline: none;
+}
+
+.login-container button {
+  padding: 12px 25px;
+  background: linear-gradient(90deg,#2563eb,#4f46e5);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.login-container button:hover {
+  transform: scale(1.05);
+}
+
+/* ERROR MESSAGE */
+.error-msg {
+  color: #ef4444;
+  font-size: 0.9rem;
+  margin-top: 10px;
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  margin: 20px 0;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+}
+
+th, td {
+  padding: 12px 15px;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+}
+
+th {
+  background: #2563eb;
+  color: white;
+}
+
+/* VIDEO (Scanner) */
+video {
+  width: 100%;
+  max-width: 500px;
+  border-radius: 15px;
+  margin: 20px auto;
+  display: block;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+}
+
+/* BUTTONS INSIDE PAGES */
+button.scan-btn {
+  padding: 10px 18px;
+  margin: 5px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(90deg,#2563eb,#4f46e5);
+  color: white;
+  transition: all 0.3s ease;
+}
+
+button.scan-btn:hover {
+  transform: scale(1.05);
+}
+
+/* QR Generator Result */
+#qrResult {
+  margin-top: 15px;
+  text-align: center;
+}
+
+#qrResult p {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+/* TOAST NOTIFICATION */
+.toast {
+  position: fixed;
+  top: 20px; /* pwede rin bottom:20px */
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2563eb;
+  color: white;
+  padding: 12px 25px;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  z-index: 999;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+</style>
+
+</head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+
+<body>
+
+<div id="app"></div>
+
+<!-- jsQR CDN -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+<script>
+// ---------- ADMIN CREDENTIALS ----------
+let ADMIN_USER="admin";
+let ADMIN_PASS="1234";
+
+function showToast(message, duration=2000){
+  let toast = document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(()=>{ toast.classList.add("show"); }, 50); // allow DOM render
+  setTimeout(()=>{
+    toast.classList.remove("show");
+    setTimeout(()=>{ document.body.removeChild(toast); }, 500);
+  }, duration);
+}
+
+
+// ---------- INITIALIZE STORAGE ----------
+if(!localStorage.getItem("attendanceList")) localStorage.setItem("attendanceList",JSON.stringify([]));
+if(!localStorage.getItem("settings")) localStorage.setItem("settings",JSON.stringify({cutoffTime:"08:00"}));
+
+// ---------- APP CONTAINER ----------
+const app = document.getElementById("app");
+
+// ---------- RENDER LOGIN ----------
+function renderLogin(){
+  app.innerHTML=`
+    <div class="login-container">
+      <h2>Admin Login</h2>
+      <input type="text" id="username" placeholder="Username" required>
+      <input type="password" id="password" placeholder="Password" required>
+      <button id="loginBtn">Login</button>
+      
+      <p id="loginMsg" class="error-msg"></p>
+    </div>
+
+  `;
+  document.getElementById("loginBtn").addEventListener("click",loginAdmin);
+ 
+}
+
+function loginAdmin(){
+  const username=document.getElementById("username").value.trim();
+  const password=document.getElementById("password").value.trim();
+  if(username===ADMIN_USER && password===ADMIN_PASS){
+    localStorage.setItem("loggedIn","true");
+    renderDashboard();
+  } else {
+    document.getElementById("loginMsg").textContent="Incorrect username or password";
+  }
+}
+
+function forgotPassword(){
+  alert(`Admin credentials:\nUsername: ${ADMIN_USER}\nPassword: ${ADMIN_PASS}`);
+}
+
+// ---------- RENDER DASHBOARD ----------
+function renderDashboard(){
+  app.innerHTML=`
+    <div class="navbar">
+      <span class="nav-item" data-page="qrgenerator">QR Generator</span>
+      <span class="nav-item" data-page="home">HOME</span>
+      <span class="nav-item" data-page="scanner">QR Scanner</span>
+      <span class="nav-item" data-page="attendance">Attendance List</span>
+      <span class="nav-item" data-page="settings">Settings</span>
+      <span class="nav-item" data-page="penalty">Penalty</span>
+      <span class="nav-item" id="logoutBtn">Logout</span>
+    </div>
+    <div class="container" id="pageContainer"></div>
+  `;
+  const navItems=document.querySelectorAll(".nav-item");
+  const logoutBtn=document.getElementById("logoutBtn");
+
+  navItems.forEach(nav=>{
+    const page=nav.getAttribute("data-page");
+    if(page) nav.addEventListener("click",()=>renderPage(page));
+  });
+
+  logoutBtn.addEventListener("click",()=>{
+    localStorage.removeItem("loggedIn");
+    renderLogin();
+  });
+
+  renderPage("home");
+}
+
+// ---------- RENDER PAGES ----------
+function renderPage(page){
+  const pageContainer=document.getElementById("pageContainer");
+  const attendanceList=JSON.parse(localStorage.getItem("attendanceList"));
+  const settings=JSON.parse(localStorage.getItem("settings"));
+
+  if(page==="home"){
+    pageContainer.innerHTML=`<h2>HOME</h2>
+      <p>Total Students Scanned: ${attendanceList.length}</p>
+      <p>Cutoff Time for Late: ${settings.cutoffTime}</p>`;
+  }
+
+  if(page==="scanner"){
+  pageContainer.innerHTML=`
+    <div class="card" style="max-width:600px;margin:40px auto;text-align:center;">
+      <h2>QR Scanner</h2>
+      <video id="video" autoplay playsinline></video>
+      <p>Students scan their QR code</p>
+    </div>
+  `;
+  startScanner();
+}
+
+
+  if(page==="attendance"){
+    let html=`<h2>Attendance List</h2><table><thead><tr><th>ID</th><th>Name</th><th>Time</th><th>Status</th></tr></thead><tbody>`;
+    attendanceList.forEach(stu=>{
+      html+=`<tr><td>${stu.id}</td><td>${stu.name}</td><td>${stu.time}</td><td>${stu.status||"On-time"}</td></tr>`;
+    });
+    html+=`</tbody></table>`;
+    pageContainer.innerHTML=html;
+  }
+
+if(page==="settings"){
+  pageContainer.innerHTML=`
+    <div class="card" style="max-width:500px;margin:40px auto;text-align:center;">
+      <h2>Settings</h2>
+      <label>Cutoff Time for Late: 
+        <input type="time" id="cutoffTime" value="${settings.cutoffTime}">
+      </label>
+      <button id="saveSettingsBtn">Save Settings</button>
+      <hr style="margin:20px 0;">
+      <label>New Admin Password: 
+        <input type="password" id="newAdminPass" placeholder="Enter new password">
+      </label>
+      <button id="savePassBtn">Update Password</button>
+    </div>
+  `;
+
+  // Save cutoff time
+  document.getElementById("saveSettingsBtn").addEventListener("click",()=>{
+    const newTime=document.getElementById("cutoffTime").value;
+    settings.cutoffTime=newTime;
+    localStorage.setItem("settings",JSON.stringify(settings));
+    showToast("Settings saved!",2000);
+  });
+
+  // Update admin password
+  document.getElementById("savePassBtn").addEventListener("click",()=>{
+    const newPass=document.getElementById("newAdminPass").value.trim();
+    if(newPass.length<4){
+      showToast("Password must be at least 4 characters",2000);
+      return;
+    }
+    ADMIN_PASS=newPass;
+    showToast("Admin password updated!",2000);
+    document.getElementById("newAdminPass").value="";
+  });
+}
+
+
+  if(page==="penalty"){
+    let html=`<h2>Penalty (Late Students)</h2><table><thead><tr><th>ID</th><th>Name</th><th>Time</th></tr></thead><tbody>`;
+    attendanceList.filter(stu=>stu.status==="Late").forEach(stu=>{
+      html+=`<tr><td>${stu.id}</td><td>${stu.name}</td><td>${stu.time}</td></tr>`;
+    });
+    html+=`</tbody></table>`;
+    pageContainer.innerHTML=html;
+  }if(page==="qrgenerator"){
+  pageContainer.innerHTML=`
+    <div class="card" style="max-width:500px;margin:40px auto;text-align:center;">
+      <h2>Student QR Code Generator</h2>
+      <input type="text" id="studentId" placeholder="Student ID">
+      <input type="text" id="studentName" placeholder="Full Name">
+      <button id="generateBtn">Generate QR</button>
+      <div id="qrResult"></div>
+    </div>
+  `;
+
+  document.getElementById("generateBtn").addEventListener("click",()=>{
+    const id = document.getElementById("studentId").value.trim();
+    const name = document.getElementById("studentName").value.trim();
+    if(!id || !name){
+  showToast("Please enter both ID and Name", 2000);
+  
+
+  return;
+}
+
+
+    const qr = new QRious({
+      element: document.createElement('canvas'),
+      value: `${id}|${name}`,
+      size: 200
+    });
+
+    const resultDiv = document.getElementById("qrResult");
+    resultDiv.innerHTML = `<p>QR Code for ${name}</p>`;
+    resultDiv.appendChild(qr.element);
+  });
+}
+
+
+}
+
+
+
+
+// ---------- QR SCANNER ----------
+function startScanner(){
+  const video=document.getElementById("video");
+  navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false})
+  .then(stream=>{
+    video.srcObject=stream;
+    video.setAttribute("playsinline",true);
+    requestAnimationFrame(scanFrame);
+  }).catch(err => {
+  const pageContainer = document.getElementById("pageContainer");
+  const errorDiv = document.createElement("p");
+  errorDiv.style.color = "#ef4444";
+  errorDiv.style.fontWeight = "600";
+  errorDiv.textContent = "⚠️ No back camera found!";
+  pageContainer.appendChild(errorDiv);
+});
+
+
+  function scanFrame(){
+    if(video.readyState===video.HAVE_ENOUGH_DATA){
+      const canvas=document.createElement("canvas");
+      canvas.width=video.videoWidth;
+      canvas.height=video.videoHeight;
+      const ctx=canvas.getContext("2d");
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+
+      const code=jsQR(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
+      if(code){
+        const [id,name]=code.data.split("|");
+        let attendanceList=JSON.parse(localStorage.getItem("attendanceList"));
+        if(!attendanceList.some(stu=>stu.id===id)){
+          const currentTime=new Date();
+          const cutoff=new Date();
+          const [h,m]=JSON.parse(localStorage.getItem("settings")).cutoffTime.split(":");
+          cutoff.setHours(h,m,0,0);
+          const status=currentTime>cutoff?"Late":"On-time";
+
+          attendanceList.push({id,name,time:currentTime.toLocaleTimeString(),status});
+          localStorage.setItem("attendanceList",JSON.stringify(attendanceList));
+          // dati: alert(`${name} scanned successfully (${status})`);
+showToast(`${name} scanned successfully (${status})`, 2000);
+          renderPage("attendance");
+        }
+      }
+    }
+    requestAnimationFrame(scanFrame);
+  }
+}
+
+// ---------- INITIAL LOAD ----------
+if(localStorage.getItem("loggedIn")==="true"){
+  renderDashboard();
+}else{
+  renderLogin();
+}
+</script>
+</body>
+</html>
