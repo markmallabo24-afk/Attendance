@@ -316,12 +316,47 @@ function renderPage(page){
 
 
   if(page==="attendance"){
-    let html=`<h2>Attendance List</h2><table><thead><tr><th>ID</th><th>Name</th><th>Time</th><th>Status</th></tr></thead><tbody>`;
-    attendanceList.forEach(stu=>{
-      html+=`<tr><td>${stu.id}</td><td>${stu.name}</td><td>${stu.time}</td><td>${stu.status||"On-time"}</td></tr>`;
-    });
+    let html=`<h2>Attendance List</h2>
+<table>
+<thead>
+<tr>
+  <th>ID</th>
+  <th>Name</th>
+  <th>Time</th>
+  <th>Status</th>
+  <th>Action</th>
+</tr>
+</thead>
+<tbody>`;
+
+   attendanceList.forEach((stu, index)=>{
+  html+=`
+  <tr>
+    <td>${stu.id}</td>
+    <td>${stu.name}</td>
+    <td>${stu.time}</td>
+    <td>${stu.status || "On-time"}</td>
+    <td><button class="delBtn" data-index="${index}">Delete</button></td>
+  </tr>`;
+});
+
     html+=`</tbody></table>`;
     pageContainer.innerHTML=html;
+    // Activate delete buttons
+document.querySelectorAll(".delBtn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    let i = btn.getAttribute("data-index");
+
+    if(confirm("Delete this student's attendance?")){
+      let attendance = JSON.parse(localStorage.getItem("attendanceList"));
+      attendance.splice(i, 1);
+      localStorage.setItem("attendanceList", JSON.stringify(attendance));
+      showToast("Deleted successfully", 2000);
+      renderPage("attendance"); // reload the list
+    }
+  });
+});
+
   }
 
 if(page==="settings"){
